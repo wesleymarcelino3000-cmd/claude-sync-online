@@ -1,0 +1,10 @@
+{
+  "name": "claude-sync-agent",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Agente local que detecta atividade do Claude Code e sincroniza o projeto ShipFlow.",
+  "type": "module",
+  "scripts": {
+    "start": "node claude-sync-agent.mjs"
+  }
+}
