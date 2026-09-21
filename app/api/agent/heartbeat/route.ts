@@ -3,6 +3,17 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
+type ProjectContextPayload = {
+  summary?: string;
+  current_state?: string;
+  last_change?: string;
+  changed_files?: string[];
+  blockers?: string;
+  next_step?: string;
+  commit_sha?: string;
+  updated_by?: string;
+};
+
 type Heartbeat = {
   agent_id?: string;
   account?: "Claude normal" | "Claude Gateway";
@@ -13,6 +24,7 @@ type Heartbeat = {
   changed_files?: string[];
   last_commit?: string;
   last_activity_at?: string;
+  project_context?: ProjectContextPayload;
 };
 
 export async function POST(request: Request) {
@@ -65,6 +77,31 @@ export async function POST(request: Request) {
     updated_at: now,
   });
   if (sessionError) return NextResponse.json({ error: sessionError.message }, { status: 500 });
+
+  if (body.project_context) {
+    const { data: existingContext } = await supabase
+      .from("project_context")
+      .select("id,summary,current_state,last_change,changed_files,blockers,next_step,commit_sha,updated_by,updated_at")
+      .eq("id", "shipflow")
+      .maybeSingle();
+
+    const incoming = body.project_context;
+    const context = {
+      id: "shipflow",
+      summary: incoming.summary ?? existingContext?.summary ?? "",
+      current_state: incoming.current_state ?? existingContext?.current_state ?? "",
+      last_change: incoming.last_change ?? existingContext?.last_change ?? "",
+      changed_files: incoming.changed_files ?? existingContext?.changed_files ?? [],
+      blockers: incoming.blockers ?? existingContext?.blockers ?? "",
+      next_step: incoming.next_step ?? existingContext?.next_step ?? "",
+      commit_sha: incoming.commit_sha ?? existingContext?.commit_sha ?? "",
+      updated_by: incoming.updated_by ?? existingContext?.updated_by ?? account,
+      updated_at: now,
+    };
+
+    const { error: contextError } = await supabase.from("project_context").upsert(context);
+    if (contextError) return NextResponse.json({ error: contextError.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, updated_at: now });
 }
