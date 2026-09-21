@@ -73,7 +73,8 @@ export default function Home() {
       ]);
       if (!active) return;
       if (se || ee) {
-        setNotice(`Supabase conectado, mas faltam as tabelas ou a autorização${auth.session ? "." : " — entre com GitHub."}`);
+        const dbError = se?.message || ee?.message || "erro desconhecido";
+        setNotice(`Supabase conectado, mas faltam as tabelas ou a autorização: ${dbError}`);
       } else {
         if (sd?.length) setSessions(sd as Session[]);
         if (ed?.length) setEvents(ed as Event[]);
