@@ -55,6 +55,17 @@ function git(project, args) {
   catch { return ""; }
 }
 
+function readProjectSummary(project) {
+  const files = ["CLAUDE.md", "README.md", "README.MD"];
+  for (const file of files) {
+    try {
+      const text = fs.readFileSync(path.join(project, file), "utf8").trim();
+      if (text) return text.replace(/\s+/g, " ").slice(0, 800);
+    } catch {}
+  }
+  return "";
+}
+
 function claudeIsRunning() {
   try {
     const output = execFileSync("tasklist", ["/FO", "CSV", "/NH"], { encoding: "utf8", timeout: 5000 });
@@ -92,14 +103,27 @@ async function heartbeat() {
     console.log("Projeto ShipFlow não encontrado. Tentando novamente...");
     return;
   }
+
   watch(project);
-  const changed = git(project, ["status", "--porcelain"]).split("\n").filter(Boolean).map((line) => line.slice(3)).slice(0, 100);
+  const changed = git(project, ["status", "--porcelain"])
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.slice(3))
+    .slice(0, 100);
   const branch = git(project, ["branch", "--show-current"]);
   const commit = git(project, ["rev-parse", "--short", "HEAD"]);
+  const commitMessage = git(project, ["log", "-1", "--pretty=format:%h — %s"]);
   const recent = Date.now() - lastActivity < 120000;
   const status = claudeIsRunning() || recent ? "working" : "paused";
   const remote = git(project, ["config", "--get", "remote.origin.url"]);
   const projectName = path.basename(project);
+  const projectSummary = readProjectSummary(project);
+  const statusText = status === "working" ? "Em trabalho" : "Aguardando alterações";
+  const currentState = `${statusText}; ${changed.length} arquivo(s) alterado(s); branch ${branch || "não identificada"}.`;
+  const nextStep = changed.length
+    ? "Revisar e concluir as alterações detectadas."
+    : "Aguardar a próxima alteração no projeto.";
+
   try {
     await send({
       agent_id: `${ACCOUNT}-${os.hostname()}`,
@@ -111,6 +135,15 @@ async function heartbeat() {
       changed_files: changed,
       last_commit: commit,
       last_activity_at: new Date(lastActivity).toISOString(),
+      project_context: {
+        summary: projectSummary || undefined,
+        current_state: currentState,
+        last_change: commitMessage || (recent ? "Alteração local detectada" : ""),
+        changed_files: changed,
+        next_step: nextStep,
+        commit_sha: commit,
+        updated_by: ACCOUNT,
+      },
     });
     console.log(`[${new Date().toLocaleTimeString()}] ${status} — ${projectName} — ${changed.length} arquivo(s)`);
   } catch (error) {
