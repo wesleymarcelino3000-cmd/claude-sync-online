@@ -134,8 +134,10 @@ ${data.next_step}
 ## Arquivos alterados
 ${files}
 
-## Instrução para a próxima conta
-Leia este arquivo antes de começar. Continue a partir do estado descrito e atualize o projeto normalmente. O arquivo é apenas um resumo operacional; não contém tokens ou senhas.
+## Comando automático para a próxima conta
+Leia este arquivo antes de começar, identifique o próximo passo e continue o trabalho neste mesmo projeto. Não peça esse comando ao usuário e não inicie outro projeto.
+
+O arquivo é apenas um resumo operacional; não contém tokens ou senhas.
 `;
     fs.writeFileSync(path.join(directory, CONTEXT_FILE), Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(content, "utf8")]));
     keepContinuityOutOfGit(project);
