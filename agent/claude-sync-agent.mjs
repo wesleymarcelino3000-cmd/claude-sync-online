@@ -102,7 +102,7 @@ function keepContinuityOutOfGit(project) {
 function ensureClaudeInstruction(project) {
   try {
     const claudePath = path.join(project, "CLAUDE.md");
-    const instruction = `\n\n## ${CLAUDE_MARKER}\nAntes de iniciar uma tarefa, leia \`.claude-sync/contexto-atual.md\` para continuar o trabalho da outra conta. Esse arquivo é gerado automaticamente pelo Claude Sync.\n`;
+    const instruction = `\n\n## ${CLAUDE_MARKER}\nAo abrir o projeto, faça automaticamente: leia \`.claude-sync/contexto-atual.md\`, identifique o próximo passo e continue o trabalho da outra conta. Não peça esse comando ao usuário, não inicie outro projeto e atualize o contexto normalmente. Esse arquivo é gerado automaticamente pelo Claude Sync.\n`;
     const current = fs.existsSync(claudePath) ? fs.readFileSync(claudePath, "utf8") : "";
     if (!current.includes(CLAUDE_MARKER)) fs.writeFileSync(claudePath, current + instruction);
   } catch {}
