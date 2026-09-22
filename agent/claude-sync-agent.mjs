@@ -136,7 +136,7 @@ ${files}
 ## Instrução para a próxima conta
 Leia este arquivo antes de começar. Continue a partir do estado descrito e atualize o projeto normalmente. O arquivo é apenas um resumo operacional; não contém tokens ou senhas.
 `;
-    fs.writeFileSync(path.join(directory, CONTEXT_FILE), content, "utf8");
+    fs.writeFileSync(path.join(directory, CONTEXT_FILE), Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(content, "utf8")]));
     keepContinuityOutOfGit(project);
     ensureClaudeInstruction(project);
   } catch (error) {
