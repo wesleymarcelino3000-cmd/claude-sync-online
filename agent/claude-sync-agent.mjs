@@ -10,7 +10,7 @@ const ACCOUNT = process.env.ACCOUNT || "Claude normal";
 const INTERVAL = 15000;
 const CONTEXT_DIR = ".claude-sync";
 const CONTEXT_FILE = "contexto-atual.md";
-const CLAUDE_MARKER = "CLAUDE SYNC — CONTINUIDADE AUTOMÁTICA";
+const CLAUDE_MARKER = "CLAUDE SYNC — CONTINUIDADE AUTOMÁTICA V2";
 
 if (!SYNC_TOKEN) {
   console.error("Defina SYNC_TOKEN antes de iniciar o agente.");
