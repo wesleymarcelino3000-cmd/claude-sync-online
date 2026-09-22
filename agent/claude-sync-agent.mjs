@@ -8,6 +8,9 @@ const SYNC_URL = process.env.SYNC_URL || "https://claude-sync-online.vercel.app/
 const SYNC_TOKEN = process.env.SYNC_TOKEN;
 const ACCOUNT = process.env.ACCOUNT || "Claude normal";
 const INTERVAL = 15000;
+const CONTEXT_DIR = ".claude-sync";
+const CONTEXT_FILE = "contexto-atual.md";
+const CLAUDE_MARKER = "CLAUDE SYNC — CONTINUIDADE AUTOMÁTICA";
 
 if (!SYNC_TOKEN) {
   console.error("Defina SYNC_TOKEN antes de iniciar o agente.");
@@ -84,6 +87,63 @@ async function send(data) {
   if (!response.ok) throw new Error(`Sincronização HTTP ${response.status}`);
 }
 
+function keepContinuityOutOfGit(project) {
+  try {
+    const excludePath = path.join(project, ".git", "info", "exclude");
+    let exclude = fs.existsSync(excludePath) ? fs.readFileSync(excludePath, "utf8") : "";
+    if (!exclude.split(/\r?\n/).includes(`${CONTEXT_DIR}/`)) {
+      exclude = `${exclude.trimEnd()}\n${CONTEXT_DIR}/\n`;
+      fs.writeFileSync(excludePath, exclude);
+    }
+  } catch {}
+}
+
+function ensureClaudeInstruction(project) {
+  try {
+    const claudePath = path.join(project, "CLAUDE.md");
+    const instruction = `\n\n## ${CLAUDE_MARKER}\nAntes de iniciar uma tarefa, leia \`.claude-sync/contexto-atual.md\` para continuar o trabalho da outra conta. Esse arquivo é gerado automaticamente pelo Claude Sync.\n`;
+    const current = fs.existsSync(claudePath) ? fs.readFileSync(claudePath, "utf8") : "";
+    if (!current.includes(CLAUDE_MARKER)) fs.writeFileSync(claudePath, current + instruction);
+  } catch {}
+}
+
+function writeContinuityFile(project, data) {
+  try {
+    const directory = path.join(project, CONTEXT_DIR);
+    fs.mkdirSync(directory, { recursive: true });
+    const files = data.changed_files.length ? data.changed_files.map((file) => `- ${file}`).join("\n") : "- Nenhum arquivo alterado no momento.";
+    const content = `# Contexto atual do projeto
+
+> Gerado automaticamente pelo Claude Sync em ${new Date().toLocaleString("pt-BR")}.
+
+## Projeto
+- Nome: ${data.project_name}
+- Conta que atualizou: ${data.account}
+- Branch: ${data.branch || "não identificada"}
+
+## Estado atual
+${data.current_state}
+
+## Última alteração
+${data.last_change || "Nenhuma alteração registrada."}
+
+## Próximo passo
+${data.next_step}
+
+## Arquivos alterados
+${files}
+
+## Instrução para a próxima conta
+Leia este arquivo antes de começar. Continue a partir do estado descrito e atualize o projeto normalmente. O arquivo é apenas um resumo operacional; não contém tokens ou senhas.
+`;
+    fs.writeFileSync(path.join(directory, CONTEXT_FILE), content, "utf8");
+    keepContinuityOutOfGit(project);
+    ensureClaudeInstruction(project);
+  } catch (error) {
+    console.error(`Não foi possível escrever o contexto local: ${error.message}`);
+  }
+}
+
 let lastActivity = Date.now();
 let watchedProject = null;
 
@@ -92,7 +152,7 @@ function watch(project) {
   watchedProject = project;
   try {
     fs.watch(project, { recursive: true }, (_event, filename) => {
-      if (filename && !/node_modules|\.git/i.test(filename)) lastActivity = Date.now();
+      if (filename && !/node_modules|\.git|\.claude-sync/i.test(filename)) lastActivity = Date.now();
     });
   } catch {}
 }
@@ -109,6 +169,7 @@ async function heartbeat() {
     .split("\n")
     .filter(Boolean)
     .map((line) => line.slice(3))
+    .filter((file) => !file.startsWith(`${CONTEXT_DIR}/`))
     .slice(0, 100);
   const branch = git(project, ["branch", "--show-current"]);
   const commit = git(project, ["rev-parse", "--short", "HEAD"]);
@@ -124,6 +185,17 @@ async function heartbeat() {
     ? "Revisar e concluir as alterações detectadas."
     : "Aguardar a próxima alteração no projeto.";
 
+  const contextData = {
+    project_name: projectName,
+    account: ACCOUNT,
+    branch,
+    current_state: currentState,
+    last_change: commitMessage || (recent ? "Alteração local detectada" : ""),
+    next_step: nextStep,
+    changed_files: changed,
+  };
+  writeContinuityFile(project, contextData);
+
   try {
     await send({
       agent_id: `${ACCOUNT}-${os.hostname()}`,
@@ -138,7 +210,7 @@ async function heartbeat() {
       project_context: {
         summary: projectSummary || undefined,
         current_state: currentState,
-        last_change: commitMessage || (recent ? "Alteração local detectada" : ""),
+        last_change: contextData.last_change,
         changed_files: changed,
         next_step: nextStep,
         commit_sha: commit,
