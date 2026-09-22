@@ -18,6 +18,7 @@ if (!SYNC_TOKEN) {
 }
 
 const candidates = [
+  process.env.PROJECT_PATH,
   process.cwd(),
   path.join(HOME, "shipflow"),
   path.join(HOME, "shipflow-portal"),
